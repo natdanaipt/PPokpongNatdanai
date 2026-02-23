@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HRRN Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&family=Space+Mono:wght@400;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<style>
+  :root { --accent:#ff7b72; --accent-bg:rgba(255,123,114,0.08); --accent-border:rgba(255,123,114,0.35); --accent-glow:rgba(255,123,114,0.07); }
+  .nav-logo { color: var(--accent); }
+  .ratio-table { width:100%; border-collapse:collapse; font-family:'Space Mono',monospace; font-size:0.75rem; }
+  .ratio-table th { padding:0.5rem 0.75rem; background:rgba(255,123,114,0.07); color:var(--muted); font-size:0.63rem; letter-spacing:0.06em; text-align:center; border-bottom:1px solid var(--border); }
+  .ratio-table th:first-child { text-align:left; }
+  .ratio-table td { padding:0.55rem 0.75rem; text-align:center; border-top:1px solid rgba(48,54,61,0.4); }
+  .ratio-table td:first-child { text-align:left; }
+  .ratio-win { color:var(--green); font-weight:700; }
+  .ratio-na { color:var(--muted); font-style:italic; }
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo">⚙ Process Scheduling</div>
+  <div class="nav-links">
+    <a class="nav-btn" href="index.html">หน้าหลัก</a>
+    <a class="nav-btn" href="fcfs.html">FCFS</a>
+    <a class="nav-btn" href="rr.html">RR</a>
+    <a class="nav-btn" href="srt.html">SRT</a>
+    <a class="nav-btn active" href="hrrn.html">HRRN</a>
+  </div>
+</nav>
+
+<div class="page-header" data-label="HRRN">
+  <div class="algo-badge">NON-PREEMPTIVE · แก้ Starvation</div>
+  <div class="page-title">Highest Response Ratio Next</div>
+  <div class="page-subtitle">กรอกข้อมูลโปรเซส แล้วกด "คำนวณ" เพื่อดู Response Ratio และ Gantt Chart</div>
+</div>
+
+<main>
+  <div class="layout">
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">// โปรเซส</span>
+          <button class="btn btn-add" onclick="addProcess()">+ เพิ่ม</button>
+        </div>
+        <div class="panel-body">
+          <table class="proc-table">
+            <thead><tr><th>ID</th><th>Arrival</th><th>Service</th><th></th></tr></thead>
+            <tbody id="proc-tbody"></tbody>
+          </table>
+          <div class="btn-row">
+            <button class="btn btn-reset" onclick="resetDefault()">↺ รีเซ็ต</button>
+            <button class="btn btn-run" onclick="calculate()">▶ คำนวณ</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:1rem;">
+        <div class="panel-header"><span class="panel-title">// สูตร HRRN</span></div>
+        <div class="panel-body">
+          <div style="background:var(--accent-bg);border:1px solid var(--accent-border);border-radius:8px;padding:0.75rem 1rem;font-family:'Space Mono',monospace;font-size:0.85rem;color:var(--accent);text-align:center;margin-bottom:0.75rem;">
+            Ratio = (W + S) / S
+          </div>
+          <div style="font-size:0.85rem;color:var(--muted);line-height:1.7;">
+            <div>W = เวลารอ (ปัจจุบัน − Arrival)</div>
+            <div>S = Service Time ของโปรเซส</div>
+            <div style="margin-top:0.5rem;">📌 <strong style="color:var(--text)">Non-Preemptive</strong></div>
+            <div>📌 คำนวณ Ratio ทุกครั้งที่ CPU ว่าง</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-area" id="result-area">
+      <div class="placeholder">
+        <div class="placeholder-icon">📐</div>
+        <div>กรอกข้อมูลโปรเซสแล้วกด <strong style="color:var(--accent)">คำนวณ</strong></div>
+        <div style="margin-top:0.4rem;font-size:0.75rem;">จะแสดง Response Ratio และ Gantt Chart</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-bottom">
+    <a class="nav-page-btn" style="color:#3fb950" href="srt.html">← SRT</a>
+    <a class="nav-page-btn" style="color:var(--muted)" href="index.html">กลับหน้าหลัก →</a>
+  </div>
+</main>
+<footer>ผู้สอน: ปกกป้อง พินพันธ์ · ณัฐดนัย โพธิ์ทอง</footer>
+
+<script src="shared.js"></script>
+<script>
+  const DEFAULT = [{arrival:0,service:3},{arrival:2,service:6},{arrival:4,service:4},{arrival:6,service:5},{arrival:8,service:2}];
+
+  function resetDefault() {
+    processes = []; pidCounter = 1;
+    DEFAULT.forEach(r => addProcess(r.arrival, r.service));
+    document.getElementById('result-area').innerHTML = `<div class="placeholder"><div class="placeholder-icon">📐</div><div>กรอกข้อมูลโปรเซสแล้วกด <strong style="color:var(--accent)">คำนวณ</strong></div><div style="margin-top:0.4rem;font-size:0.75rem;">จะแสดง Response Ratio และ Gantt Chart</div></div>`;
+  }
+
+  function calculate() {
+    if (!processes.length) return alert('กรุณาเพิ่มโปรเซสอย่างน้อย 1 ตัว');
+    const { segments, results, totalTime, ratioLog } = runHRRNwithLog();
+    showResult(segments, results, totalTime, ratioLog);
+  }
+
+  // HRRN with ratio log for display
+  function runHRRNwithLog() {
+    const procs = processes.map(p => ({ ...p, finished: false, start_first: null, finish: 0 }));
+    let t = 0, done = 0, segments = [], ratioLog = [];
+
+    while (done < procs.length) {
+      const available = procs.filter(p => !p.finished && p.arrival <= t);
+      if (!available.length) { t++; continue; }
+
+      const snapshot = {};
+      procs.forEach(p => {
+        if (p.finished) snapshot[p.id] = { ratio: null, status: 'done' };
+        else if (p.arrival > t) snapshot[p.id] = { ratio: null, status: 'not_arrived' };
+        else { snapshot[p.id] = { ratio: ((t - p.arrival + p.service) / p.service).toFixed(2), status: 'waiting' }; }
+      });
+
+      available.forEach(p => { p.ratio = (t - p.arrival + p.service) / p.service; });
+      const cur = available.sort((a,b) => b.ratio - a.ratio || a.arrival - b.arrival)[0];
+      snapshot[cur.id].winner = true;
+
+      ratioLog.push({ time: t, snapshot, winner: cur.id });
+
+      if (cur.start_first === null) cur.start_first = t;
+      segments.push({ pid: cur.id, start: t, end: t + cur.service, color: cur.color });
+      t += cur.service;
+      cur.finish = t; cur.finished = true; done++;
+    }
+    return { segments, results: procs, totalTime: t, ratioLog };
+  }
+
+  function showResult(segments, results, totalTime, ratioLog) {
+    const ra = document.getElementById('result-area');
+
+    // Build ratio table HTML
+    const pids = processes.map(p => p.id);
+    let ratioRows = ratioLog.map(log => {
+      const cells = pids.map(pid => {
+        const s = log.snapshot[pid];
+        const proc = processes.find(p => p.id === pid);
+        if (s.status === 'done') return `<td class="ratio-na">done</td>`;
+        if (s.status === 'not_arrived') return `<td class="ratio-na">—</td>`;
+        const cls = log.winner === pid ? 'ratio-win' : '';
+        const star = log.winner === pid ? ' ★' : '';
+        return `<td class="${cls}">${s.ratio}${star}</td>`;
+      }).join('');
+      return `<tr><td>t = ${log.time}</td>${cells}</tr>`;
+    }).join('');
+
+    const pHeaders = pids.map(pid => {
+      const p = processes.find(x => x.id === pid);
+      return `<th style="color:${p.color}">P${pid}</th>`;
+    }).join('');
+
+    ra.innerHTML = `
+      <div class="stats-strip anim-in">
+        <div class="stat-card"><div class="stat-label">AVG TURNAROUND TIME</div><div class="stat-value" id="stat-avg-tr">—</div></div>
+        <div class="stat-card"><div class="stat-label">AVG NORMALIZED Tr/Ts</div><div class="stat-value" id="stat-avg-ntr">—</div></div>
+      </div>
+      <div class="gantt-panel anim-in" style="animation-delay:0.05s">
+        <div class="panel-header"><span class="panel-title">// Gantt Chart</span><span style="font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--muted)">Total: ${totalTime} units</span></div>
+        <div style="padding:1rem 1.25rem 0">
+          <div class="gantt-bar-wrap"><div class="gantt-bar" id="gantt-bar"></div></div>
+          <div class="gantt-timeline-wrap"><div id="gantt-tl"></div></div>
+        </div>
+        <div style="padding:0 1.25rem 1rem;display:flex;gap:0.6rem;flex-wrap:wrap;" id="gantt-legend"></div>
+      </div>
+      <!-- Ratio Decision Log -->
+      <div class="result-panel anim-in" style="animation-delay:0.08s">
+        <div class="panel-header"><span class="panel-title">// ตาราง Response Ratio ★ = ถูกเลือก</span></div>
+        <div style="overflow-x:auto">
+          <table class="ratio-table">
+            <thead><tr><th>เวลา</th>${pHeaders}</tr></thead>
+            <tbody>${ratioRows}</tbody>
+          </table>
+        </div>
+      </div>
+      <div class="result-panel anim-in" style="animation-delay:0.12s">
+        <div class="panel-header"><span class="panel-title">// ตารางผลลัพธ์</span></div>
+        <div style="overflow-x:auto">
+          <table class="res">
+            <thead><tr><th>ID</th><th>Arrival</th><th>Service</th><th>Start</th><th>Finish</th><th>Tr</th><th>Tr/Ts</th></tr></thead>
+            <tbody id="res-tbody"></tbody>
+          </table>
+        </div>
+      </div>`;
+
+    renderGantt(segments, totalTime, 'gantt-bar', 'gantt-tl');
+    renderLegend(segments);
+    renderResultTable(results, 'res-tbody', 'var(--accent)');
+  }
+
+  function renderLegend(segments) {
+    const seen = new Set(); const leg = document.getElementById('gantt-legend');
+    segments.forEach(s => {
+      if (seen.has(s.pid)) return; seen.add(s.pid);
+      const d = document.createElement('div');
+      d.style.cssText = `display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:0.72rem`;
+      d.innerHTML = `<span style="width:10px;height:10px;border-radius:3px;background:${s.color};display:inline-block"></span> P${s.pid}`;
+      leg.appendChild(d);
+    });
+  }
+
+  resetDefault();
+</script>
+</body>
+</html>

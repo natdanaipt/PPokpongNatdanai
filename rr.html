@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Round Robin Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&family=Space+Mono:wght@400;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<style>
+  :root { --accent:#bc8cff; --accent-bg:rgba(188,140,255,0.08); --accent-border:rgba(188,140,255,0.35); --accent-glow:rgba(188,140,255,0.07); }
+  .nav-logo { color: var(--accent); }
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo">⚙ Process Scheduling</div>
+  <div class="nav-links">
+    <a class="nav-btn" href="index.html">หน้าหลัก</a>
+    <a class="nav-btn" href="fcfs.html">FCFS</a>
+    <a class="nav-btn active" href="rr.html">RR</a>
+    <a class="nav-btn" href="srt.html">SRT</a>
+    <a class="nav-btn" href="hrrn.html">HRRN</a>
+  </div>
+</nav>
+
+<div class="page-header" data-label="RR">
+  <div class="algo-badge">PREEMPTIVE · TIME QUANTUM</div>
+  <div class="page-title">Round Robin</div>
+  <div class="page-subtitle">กำหนด Time Quantum และโปรเซส แล้วกด "คำนวณ"</div>
+</div>
+
+<main>
+  <div class="layout">
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">// ตั้งค่า</span>
+          <button class="btn btn-add" onclick="addProcess()">+ เพิ่ม</button>
+        </div>
+        <div class="panel-body">
+          <div class="quantum-row">
+            <span class="quantum-label">⏱ Time Quantum (q)</span>
+            <input type="number" class="quantum-input" id="quantum" min="1" value="1">
+          </div>
+          <table class="proc-table">
+            <thead><tr><th>ID</th><th>Arrival</th><th>Service</th><th></th></tr></thead>
+            <tbody id="proc-tbody"></tbody>
+          </table>
+          <div class="btn-row">
+            <button class="btn btn-reset" onclick="resetDefault()">↺ รีเซ็ต</button>
+            <button class="btn btn-run" onclick="calculate()">▶ คำนวณ</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:1rem;">
+        <div class="panel-header"><span class="panel-title">// หลักการ RR</span></div>
+        <div class="panel-body" style="font-size:0.88rem;color:var(--muted);line-height:1.7;">
+          <div style="margin-bottom:0.5rem;">📌 <strong style="color:var(--text)">Preemptive</strong> — สลับทุก q หน่วย</div>
+          <div style="margin-bottom:0.5rem;">📌 ยิ่ง q เล็ก = Context Switch บ่อย</div>
+          <div>📌 ยิ่ง q ใหญ่ = ใกล้เคียง FCFS มากขึ้น</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-area" id="result-area">
+      <div class="placeholder">
+        <div class="placeholder-icon">🔄</div>
+        <div>ตั้งค่า Time Quantum และโปรเซส<br>แล้วกด <strong style="color:var(--accent)">คำนวณ</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-bottom">
+    <a class="nav-page-btn" style="color:#f0883e" href="fcfs.html">← FCFS</a>
+    <a class="nav-page-btn" style="color:#3fb950" href="srt.html">SRT →</a>
+  </div>
+</main>
+<footer>ผู้สอน: ปกกป้อง พินพันธ์ · ณัฐดนัย โพธิ์ทอง</footer>
+
+<script src="shared.js"></script>
+<script>
+  const DEFAULT = [{arrival:0,service:3},{arrival:2,service:6},{arrival:4,service:4},{arrival:6,service:5},{arrival:8,service:2}];
+
+  function resetDefault() {
+    processes = []; pidCounter = 1;
+    document.getElementById('quantum').value = 1;
+    DEFAULT.forEach(r => addProcess(r.arrival, r.service));
+    document.getElementById('result-area').innerHTML = `<div class="placeholder"><div class="placeholder-icon">🔄</div><div>ตั้งค่า Time Quantum และโปรเซส<br>แล้วกด <strong style="color:var(--accent)">คำนวณ</strong></div></div>`;
+  }
+
+  function calculate() {
+    if (!processes.length) return alert('กรุณาเพิ่มโปรเซสอย่างน้อย 1 ตัว');
+    const q = parseInt(document.getElementById('quantum').value) || 1;
+    const { segments, results, totalTime } = runRR(q);
+    showResult(segments, results, totalTime, q);
+  }
+
+  function showResult(segments, results, totalTime, q) {
+    const ra = document.getElementById('result-area');
+    ra.innerHTML = `
+      <div class="stats-strip anim-in">
+        <div class="stat-card"><div class="stat-label">AVG TURNAROUND TIME</div><div class="stat-value" id="stat-avg-tr">—</div></div>
+        <div class="stat-card"><div class="stat-label">AVG NORMALIZED Tr/Ts</div><div class="stat-value" id="stat-avg-ntr">—</div></div>
+      </div>
+      <div class="gantt-panel anim-in" style="animation-delay:0.05s">
+        <div class="panel-header">
+          <span class="panel-title">// Gantt Chart</span>
+          <span style="font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--accent)">q = ${q} · Total: ${totalTime}</span>
+        </div>
+        <div style="padding:1rem 1.25rem 0">
+          <div class="gantt-bar-wrap"><div class="gantt-bar" id="gantt-bar"></div></div>
+          <div class="gantt-timeline-wrap"><div id="gantt-tl"></div></div>
+        </div>
+        <div style="padding:0 1.25rem 1rem;display:flex;gap:0.6rem;flex-wrap:wrap;" id="gantt-legend"></div>
+      </div>
+      <div class="result-panel anim-in" style="animation-delay:0.1s">
+        <div class="panel-header"><span class="panel-title">// ตารางผลลัพธ์</span></div>
+        <div style="overflow-x:auto">
+          <table class="res">
+            <thead><tr><th>ID</th><th>Arrival</th><th>Service</th><th>First CPU</th><th>Finish</th><th>Tr</th><th>Tr/Ts</th></tr></thead>
+            <tbody id="res-tbody"></tbody>
+          </table>
+        </div>
+      </div>`;
+    renderGantt(segments, totalTime, 'gantt-bar', 'gantt-tl');
+    renderLegend(segments);
+    renderResultTable(results, 'res-tbody', 'var(--accent)');
+  }
+
+  function renderLegend(segments) {
+    const seen = new Set(); const leg = document.getElementById('gantt-legend');
+    segments.forEach(s => {
+      if (seen.has(s.pid)) return; seen.add(s.pid);
+      const d = document.createElement('div');
+      d.style.cssText = `display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:0.72rem`;
+      d.innerHTML = `<span style="width:10px;height:10px;border-radius:3px;background:${s.color};display:inline-block"></span> P${s.pid}`;
+      leg.appendChild(d);
+    });
+  }
+
+  resetDefault();
+</script>
+</body>
+</html>

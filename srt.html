@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SRT Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&family=Space+Mono:wght@400;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<style>
+  :root { --accent:#3fb950; --accent-bg:rgba(63,185,80,0.08); --accent-border:rgba(63,185,80,0.35); --accent-glow:rgba(63,185,80,0.08); }
+  .nav-logo { color: var(--accent); }
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo">⚙ Process Scheduling</div>
+  <div class="nav-links">
+    <a class="nav-btn" href="index.html">หน้าหลัก</a>
+    <a class="nav-btn" href="fcfs.html">FCFS</a>
+    <a class="nav-btn" href="rr.html">RR</a>
+    <a class="nav-btn active" href="srt.html">SRT</a>
+    <a class="nav-btn" href="hrrn.html">HRRN</a>
+  </div>
+</nav>
+
+<div class="page-header" data-label="SRT">
+  <div class="algo-badge">PREEMPTIVE · 🏆 ประสิทธิภาพดีที่สุด</div>
+  <div class="page-title">Shortest Remaining Time</div>
+  <div class="page-subtitle">กรอกข้อมูลโปรเซส แล้วกด "คำนวณ" เพื่อดูผลลัพธ์</div>
+</div>
+
+<main>
+  <div class="layout">
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">// โปรเซส</span>
+          <button class="btn btn-add" onclick="addProcess()">+ เพิ่ม</button>
+        </div>
+        <div class="panel-body">
+          <table class="proc-table">
+            <thead><tr><th>ID</th><th>Arrival</th><th>Service</th><th></th></tr></thead>
+            <tbody id="proc-tbody"></tbody>
+          </table>
+          <div class="btn-row">
+            <button class="btn btn-reset" onclick="resetDefault()">↺ รีเซ็ต</button>
+            <button class="btn btn-run" onclick="calculate()">▶ คำนวณ</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:1rem;">
+        <div class="panel-header"><span class="panel-title">// หลักการ SRT</span></div>
+        <div class="panel-body" style="font-size:0.88rem;color:var(--muted);line-height:1.7;">
+          <div style="margin-bottom:0.5rem;">📌 <strong style="color:var(--text)">Preemptive</strong> — สลับได้ทุกช่วงเวลา</div>
+          <div style="margin-bottom:0.5rem;">📌 เลือกโปรเซสที่ <strong style="color:var(--text)">Remaining Time น้อยสุด</strong></div>
+          <div>📌 อาจเกิด Starvation กับโปรเซสยาว</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-area" id="result-area">
+      <div class="placeholder">
+        <div class="placeholder-icon">⚡</div>
+        <div>กรอกข้อมูลโปรเซสแล้วกด <strong style="color:var(--accent)">คำนวณ</strong></div>
+        <div style="margin-top:0.4rem;font-size:0.75rem;">SRT ให้ผลดีที่สุดในส่วนใหญ่ของกรณีทดสอบ</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-bottom">
+    <a class="nav-page-btn" style="color:#bc8cff" href="rr.html">← Round Robin</a>
+    <a class="nav-page-btn" style="color:#ff7b72" href="hrrn.html">HRRN →</a>
+  </div>
+</main>
+<footer>ผู้สอน: ปกกป้อง พินพันธ์ · ณัฐดนัย โพธิ์ทอง</footer>
+
+<script src="shared.js"></script>
+<script>
+  const DEFAULT = [{arrival:0,service:3},{arrival:2,service:6},{arrival:4,service:4},{arrival:6,service:5},{arrival:8,service:2}];
+
+  function resetDefault() {
+    processes = []; pidCounter = 1;
+    DEFAULT.forEach(r => addProcess(r.arrival, r.service));
+    document.getElementById('result-area').innerHTML = `<div class="placeholder"><div class="placeholder-icon">⚡</div><div>กรอกข้อมูลโปรเซสแล้วกด <strong style="color:var(--accent)">คำนวณ</strong></div><div style="margin-top:0.4rem;font-size:0.75rem;">SRT ให้ผลดีที่สุดในส่วนใหญ่ของกรณีทดสอบ</div></div>`;
+  }
+
+  function calculate() {
+    if (!processes.length) return alert('กรุณาเพิ่มโปรเซสอย่างน้อย 1 ตัว');
+    const { segments, results, totalTime } = runSRT();
+    showResult(segments, results, totalTime);
+  }
+
+  function showResult(segments, results, totalTime) {
+    const ra = document.getElementById('result-area');
+    ra.innerHTML = `
+      <div class="stats-strip anim-in">
+        <div class="stat-card"><div class="stat-label">AVG TURNAROUND TIME</div><div class="stat-value" id="stat-avg-tr">—</div></div>
+        <div class="stat-card"><div class="stat-label">AVG NORMALIZED Tr/Ts</div><div class="stat-value" id="stat-avg-ntr">—</div></div>
+      </div>
+      <div class="gantt-panel anim-in" style="animation-delay:0.05s">
+        <div class="panel-header"><span class="panel-title">// Gantt Chart</span><span style="font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--muted)">Total: ${totalTime} units</span></div>
+        <div style="padding:1rem 1.25rem 0">
+          <div class="gantt-bar-wrap"><div class="gantt-bar" id="gantt-bar"></div></div>
+          <div class="gantt-timeline-wrap"><div id="gantt-tl"></div></div>
+        </div>
+        <div style="padding:0 1.25rem 1rem;display:flex;gap:0.6rem;flex-wrap:wrap;" id="gantt-legend"></div>
+      </div>
+      <div class="result-panel anim-in" style="animation-delay:0.1s">
+        <div class="panel-header"><span class="panel-title">// ตารางผลลัพธ์</span></div>
+        <div style="overflow-x:auto">
+          <table class="res">
+            <thead><tr><th>ID</th><th>Arrival</th><th>Service</th><th>First CPU</th><th>Finish</th><th>Tr</th><th>Tr/Ts</th></tr></thead>
+            <tbody id="res-tbody"></tbody>
+          </table>
+        </div>
+      </div>`;
+    renderGantt(segments, totalTime, 'gantt-bar', 'gantt-tl');
+    renderLegend(segments);
+    renderResultTable(results, 'res-tbody', 'var(--accent)');
+  }
+
+  function renderLegend(segments) {
+    const seen = new Set(); const leg = document.getElementById('gantt-legend');
+    segments.forEach(s => {
+      if (seen.has(s.pid)) return; seen.add(s.pid);
+      const d = document.createElement('div');
+      d.style.cssText = `display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:0.72rem`;
+      d.innerHTML = `<span style="width:10px;height:10px;border-radius:3px;background:${s.color};display:inline-block"></span> P${s.pid}`;
+      leg.appendChild(d);
+    });
+  }
+
+  resetDefault();
+</script>
+</body>
+</html>

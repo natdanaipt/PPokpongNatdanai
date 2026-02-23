@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Process Scheduling Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&family=Space+Mono:wght@400;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--green:#3fb950;--a:#f0883e;--b:#bc8cff;--c:#3fb950;--d:#ff7b72;--e:#58a6ff;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Sarabun',sans-serif;min-height:100vh;overflow-x:hidden;}
+  nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(13,17,23,0.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:60px;}
+  .nav-logo{font-family:'Space Mono',monospace;font-size:0.85rem;color:var(--green);}
+  .nav-links{display:flex;gap:0.5rem;}
+  .nav-btn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-family:'Space Mono',monospace;font-size:0.75rem;color:var(--muted);text-decoration:none;transition:all 0.2s;}
+  .nav-btn:hover{border-color:var(--green);color:var(--green);}
+  .nav-btn.active{border-color:var(--green);color:var(--green);background:rgba(63,185,80,0.08);}
+
+  .hero{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:80px 2rem 4rem;}
+  .hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 20% 50%,rgba(63,185,80,0.07) 0%,transparent 70%),radial-gradient(ellipse 50% 50% at 80% 30%,rgba(188,140,255,0.06) 0%,transparent 70%);}
+  .grid-lines{position:absolute;inset:0;background-image:linear-gradient(rgba(48,54,61,0.35) 1px,transparent 1px),linear-gradient(90deg,rgba(48,54,61,0.35) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse at center,black 30%,transparent 80%);}
+  .hero-content{position:relative;text-align:center;max-width:1000px;width:100%;}
+
+  .hero-badge{display:inline-flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:100px;padding:6px 16px;font-family:'Space Mono',monospace;font-size:0.75rem;color:var(--muted);margin-bottom:2rem;animation:fadeUp 0.6s ease both;}
+  .badge-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+  h1{font-family:'Playfair Display',serif;font-size:clamp(2rem,4.5vw,4rem);line-height:1.1;margin-bottom:0.75rem;animation:fadeUp 0.6s ease 0.1s both;}
+  h1 .en{display:block;font-size:0.44em;color:var(--muted);font-style:italic;}
+  .hero-desc{color:var(--muted);font-size:1rem;line-height:1.7;margin-bottom:3rem;animation:fadeUp 0.6s ease 0.2s both;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+
+  /* ALGO CARDS */
+  .algo-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.25rem;max-width:860px;margin:0 auto 2.5rem;animation:fadeUp 0.6s ease 0.3s both;}
+  @media(max-width:600px){.algo-grid{grid-template-columns:1fr;}}
+  .algo-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2rem;text-decoration:none;color:var(--text);display:block;position:relative;overflow:hidden;transition:transform 0.25s,border-color 0.25s,box-shadow 0.25s;}
+  .algo-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+  .algo-card:hover{transform:translateY(-6px);box-shadow:0 20px 40px rgba(0,0,0,0.4);}
+  .algo-card.fcfs::before{background:linear-gradient(90deg,var(--a),#d4722e);}
+  .algo-card.rr::before{background:linear-gradient(90deg,var(--b),#9b6de8);}
+  .algo-card.srt::before{background:linear-gradient(90deg,var(--c),#2ea83e);}
+  .algo-card.hrrn::before{background:linear-gradient(90deg,var(--d),#e55a52);}
+  .algo-card.fcfs:hover{border-color:var(--a);}
+  .algo-card.rr:hover{border-color:var(--b);}
+  .algo-card.srt:hover{border-color:var(--c);}
+  .algo-card.hrrn:hover{border-color:var(--d);}
+  .card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:0.75rem;}
+  .card-tag{display:inline-block;font-family:'Space Mono',monospace;font-size:0.62rem;padding:3px 10px;border-radius:100px;border:1px solid;}
+  .fcfs .card-tag{color:var(--a);border-color:rgba(240,136,62,0.4);background:rgba(240,136,62,0.08);}
+  .rr .card-tag{color:var(--b);border-color:rgba(188,140,255,0.4);background:rgba(188,140,255,0.08);}
+  .srt .card-tag{color:var(--c);border-color:rgba(63,185,80,0.4);background:rgba(63,185,80,0.08);}
+  .hrrn .card-tag{color:var(--d);border-color:rgba(255,123,114,0.4);background:rgba(255,123,114,0.08);}
+  .sim-badge{font-family:'Space Mono',monospace;font-size:0.62rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:100px;padding:3px 10px;}
+  .card-name{font-family:'Playfair Display',serif;font-size:1.5rem;margin-bottom:0.25rem;}
+  .card-full{font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);margin-bottom:0.75rem;}
+  .card-desc{font-size:0.9rem;color:var(--muted);line-height:1.6;margin-bottom:1.25rem;}
+  .card-footer{display:flex;align-items:center;justify-content:space-between;}
+  .card-enter{font-family:'Space Mono',monospace;font-size:0.75rem;padding:6px 16px;border-radius:8px;border:1px solid;transition:all 0.2s;}
+  .fcfs .card-enter{color:var(--a);border-color:rgba(240,136,62,0.4);}
+  .rr .card-enter{color:var(--b);border-color:rgba(188,140,255,0.4);}
+  .srt .card-enter{color:var(--c);border-color:rgba(63,185,80,0.4);}
+  .hrrn .card-enter{color:var(--d);border-color:rgba(255,123,114,0.4);}
+  .algo-card:hover .card-enter{transform:translateX(4px);}
+  .card-icon{font-size:2rem;opacity:0.6;}
+
+  /* BOTTOM STRIP */
+  .bottom-strip{max-width:860px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:1rem;animation:fadeUp 0.6s ease 0.4s both;}
+  @media(max-width:600px){.bottom-strip{grid-template-columns:1fr;}}
+  .strip-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem 1.5rem;display:flex;align-items:center;gap:1rem;}
+  .strip-icon{font-size:1.6rem;flex-shrink:0;}
+  .strip-label{font-family:'Space Mono',monospace;font-size:0.68rem;color:var(--muted);margin-bottom:0.25rem;}
+  .strip-formula{font-family:'Space Mono',monospace;font-size:0.88rem;font-weight:700;}
+  .strip-card.tr .strip-formula{color:var(--e);}
+  .strip-card.ntr .strip-formula{color:var(--a);}
+
+  footer{text-align:center;padding:2rem;color:var(--muted);font-size:0.8rem;border-top:1px solid var(--border);}
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo">⚙ Process Scheduling</div>
+  <div class="nav-links">
+    <a class="nav-btn active" href="index.html">หน้าหลัก</a>
+    <a class="nav-btn" href="fcfs.html">FCFS</a>
+    <a class="nav-btn" href="rr.html">RR</a>
+    <a class="nav-btn" href="srt.html">SRT</a>
+    <a class="nav-btn" href="hrrn.html">HRRN</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="grid-lines"></div>
+  <div class="hero-content">
+    <div class="hero-badge"><span class="badge-dot"></span>Interactive Simulator · กรอกข้อมูลเองได้</div>
+    <h1>การจัดตารางการทำงานของโปรเซส<span class="en">Process Scheduling Simulator</span></h1>
+    <p class="hero-desc">เลือกอัลกอริทึม กรอกข้อมูลโปรเซส แล้วคำนวณ Gantt Chart<br>และ Turnaround Time ได้ทันที</p>
+
+    <div class="algo-grid">
+      <a class="algo-card fcfs" href="fcfs.html">
+        <div class="card-top">
+          <div class="card-tag">NON-PREEMPTIVE</div>
+          <div class="sim-badge">🖩 Simulator</div>
+        </div>
+        <div class="card-icon">📋</div>
+        <div class="card-name">FCFS</div>
+        <div class="card-full">First-Come, First-Served</div>
+        <div class="card-desc">ให้บริการตามลำดับที่เข้ามาก่อน เหมาะกับระบบ Batch ไม่มี Context Switch</div>
+        <div class="card-footer">
+          <div class="card-enter">เปิด Simulator →</div>
+        </div>
+      </a>
+
+      <a class="algo-card rr" href="rr.html">
+        <div class="card-top">
+          <div class="card-tag">PREEMPTIVE · q ปรับได้</div>
+          <div class="sim-badge">🖩 Simulator</div>
+        </div>
+        <div class="card-icon">🔄</div>
+        <div class="card-name">Round Robin</div>
+        <div class="card-full">Round Robin (RR)</div>
+        <div class="card-desc">แบ่งเวลา CPU ให้ทุกโปรเซสเท่ากัน กำหนด Time Quantum เองได้</div>
+        <div class="card-footer">
+          <div class="card-enter">เปิด Simulator →</div>
+        </div>
+      </a>
+
+      <a class="algo-card srt" href="srt.html">
+        <div class="card-top">
+          <div class="card-tag">PREEMPTIVE · 🏆 ดีที่สุด</div>
+          <div class="sim-badge">🖩 Simulator</div>
+        </div>
+        <div class="card-icon">⚡</div>
+        <div class="card-name">SRT</div>
+        <div class="card-full">Shortest Remaining Time</div>
+        <div class="card-desc">เลือกโปรเซสที่เหลือเวลาน้อยที่สุด ให้ค่า Turnaround Time ต่ำสุด</div>
+        <div class="card-footer">
+          <div class="card-enter">เปิด Simulator →</div>
+        </div>
+      </a>
+
+      <a class="algo-card hrrn" href="hrrn.html">
+        <div class="card-top">
+          <div class="card-tag">NON-PREEMPTIVE</div>
+          <div class="sim-badge">🖩 Simulator</div>
+        </div>
+        <div class="card-icon">📐</div>
+        <div class="card-name">HRRN</div>
+        <div class="card-full">Highest Response Ratio Next</div>
+        <div class="card-desc">แก้ปัญหา Starvation — แสดงตาราง Response Ratio ทุกขั้นตอน</div>
+        <div class="card-footer">
+          <div class="card-enter">เปิด Simulator →</div>
+        </div>
+      </a>
+    </div>
+
+    <div class="bottom-strip">
+      <div class="strip-card tr"><div class="strip-icon">⏱</div><div><div class="strip-label">TURNAROUND TIME</div><div class="strip-formula">Tr = Finish − Arrival</div></div></div>
+      <div class="strip-card ntr"><div class="strip-icon">📊</div><div><div class="strip-label">NORMALIZED Tr</div><div class="strip-formula">Tr/Ts = Tr ÷ Service</div></div></div>
+    </div>
+  </div>
+</section>
+<footer>ผู้สอน: ปกกป้อง พินพันธ์ · ณัฐดนัย โพธิ์ทอง</footer>
+</body>
+</html>
